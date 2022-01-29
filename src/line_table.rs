@@ -17,19 +17,42 @@ impl LineTable {
         }
     }
 
+    pub fn get_bounds(&self, line: usize) -> (usize, usize) {
+        let start = self.indices[line];
+        let next_start = if line == self.indices.len() - 1 {
+            self.buffer_len
+        } else {
+            self.indices[line + 1]
+        };
+
+        (start, next_start)
+    }
+
+    pub fn len(&self) -> usize {
+        self.indices.len()
+    }
+
+    pub fn get_line_at(&self, char: usize) -> usize {
+        for i in 0..self.indices.len() - 1 {
+            if self.indices[i + 1] > char {
+                return i;
+            }
+        }
+
+        self.indices[self.indices.len() - 1]
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (usize, Range<usize>)> + '_ {
         LineIter {
-            indices: &self.indices,
+            table: &self,
             step: 0,
-            buffer_len: self.buffer_len,
         }
     }
 }
 
 struct LineIter<'a> {
-    indices: &'a Vec<usize>,
+    table: &'a LineTable,
     step: usize,
-    buffer_len: usize,
 }
 
 impl<'a> Iterator for LineIter<'a> {
@@ -38,17 +61,12 @@ impl<'a> Iterator for LineIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let step = self.step;
 
-        if step < self.indices.len() {
+        if step < self.table.indices.len() {
             self.step += 1;
 
-            let start = self.indices[step];
-            let next_start = if step == self.indices.len() - 1 {
-                self.buffer_len
-            } else {
-                self.indices[step + 1]
-            };
+            let (start, end) = self.table.get_bounds(step);
 
-            Some((step, start..next_start))
+            Some((step, start..end))
         } else {
             None
         }
