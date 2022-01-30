@@ -13,6 +13,7 @@ pub struct Session {
     line_table: LineTable,
     prompt: String,
     highlight: Vec<Vec<Range<usize>>>,
+    status: String,
     scroll_y: usize,
     scroll_x: usize,
 }
@@ -27,6 +28,7 @@ impl Session {
         let lines = table.len();
 
         Ok(Session {
+            status: format!("loaded {} characters, {} lines", buffer.len(), lines),
             file,
             buffer,
             line_table: table,
@@ -45,9 +47,10 @@ impl Session {
                 self.file
                     .set_len(self.buffer.as_bytes().len() as u64)
                     .unwrap();
-                self.file.write_all(self.buffer.as_bytes()).unwrap();
+                let n = self.file.write(self.buffer.as_bytes()).unwrap();
 
                 self.prompt.clear();
+                self.status = format!("{} bytes written", n);
             }
             // &["", s, r, ""] => {
             //     let sr = Regex::new(s).unwrap();
@@ -64,10 +67,13 @@ impl Session {
 
                 let regex = Regex::new(s).unwrap();
 
+                let old_len = self.buffer.len();
                 self.buffer.remove_matches(&regex);
 
                 self.line_table = LineTable::new(&self.buffer);
                 self.prompt.clear();
+
+                self.status = format!("{} characters less", old_len - self.buffer.len());
             }
             &["p", s, ""] => {
                 for line in &mut self.highlight {
@@ -75,6 +81,8 @@ impl Session {
                 }
 
                 let regex = Regex::new(s).unwrap();
+                let mut matches: usize = 0;
+                let mut lines: usize = 0;
 
                 for m in regex.find_iter(&self.buffer) {
                     let mut line_n = self.line_table.get_line_at(m.start());
@@ -102,8 +110,13 @@ impl Session {
                         }
 
                         line_n += 1;
+                        lines += 1;
                     }
+
+                    matches += 1;
                 }
+
+                self.status = format!("{} matches, {} lines", matches, lines);
             }
             _ => {}
         }
@@ -214,6 +227,13 @@ impl Session {
             y += 1;
         }
 
+        f.render_widget(
+            Label(
+                &self.status,
+                style::Style::default().bg(style::Color::LightRed),
+            ),
+            layout::Rect::new(0, size.height - 2, size.width, 1),
+        );
         f.render_widget(
             Label(&self.prompt, style::Style::default().bg(style::Color::Red)),
             layout::Rect::new(0, size.height - 1, size.width, 1),
