@@ -1,6 +1,5 @@
-use crate::label::Label;
 use crate::line_table::LineTable;
-use crate::text_view::*;
+use crate::widgets::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use regex::Regex;
 use std::io::{Read, Seek, Write};
@@ -177,7 +176,7 @@ impl Session {
             .split(area);
 
         f.render_widget(
-            LineNumbers {
+            text_view::LineNumbers {
                 start_at: self.scroll_y,
                 lines: self.line_table.len(),
             },
@@ -185,7 +184,7 @@ impl Session {
         );
 
         f.render_widget(
-            TextView {
+            text_view::TextView {
                 buffer: &self.buffer,
                 line_table: &self.line_table,
                 highlight: &self.highlight,
@@ -209,7 +208,7 @@ impl Session {
         self.file_ui(f, chunks[0]);
 
         f.render_widget(
-            Label(
+            label::Label(
                 &self.status,
                 style::Style::default().bg(style::Color::LightRed),
             ),
@@ -217,7 +216,7 @@ impl Session {
         );
 
         f.render_widget(
-            Label(&self.prompt, style::Style::default().bg(style::Color::Red)),
+            label::Label(&self.prompt, style::Style::default().bg(style::Color::Red)),
             chunks[2],
         );
     }

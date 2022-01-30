@@ -1,10 +1,9 @@
 #![feature(string_remove_matches)]
 #![feature(pattern)]
 
-mod label;
 mod line_table;
 mod session;
-mod text_view;
+mod widgets;
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use crossterm::{event, terminal};
