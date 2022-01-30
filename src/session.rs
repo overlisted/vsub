@@ -111,11 +111,32 @@ impl Session {
     pub fn ui<B: backend::Backend>(&self, f: &mut Frame<B>) {
         let size = f.size();
 
+        let number_digits = self.line_table.len().to_string().len() as u16 + 1; // yeah my iq score is 150 how could you tell
+
+        for y in 0..size.height {
+            f.render_widget(
+                Label("~", style::Style::default().bg(style::Color::Black)),
+                layout::Rect::new(0, y, number_digits, 1),
+            );
+        }
+
         let mut y = 0;
         for (n, range) in self.line_table.iter() {
+            let line_number = (n + 1).to_string();
+
+            f.render_widget(
+                Label(
+                    &line_number,
+                    style::Style::default().bg(style::Color::Black),
+                ),
+                layout::Rect::new(0, y, number_digits, 1),
+            );
+
+            let file_start = number_digits + 1;
+
             f.render_widget(
                 Label(&self.buffer[range.clone()], style::Style::default()),
-                layout::Rect::new(0, y, size.width, 1),
+                layout::Rect::new(file_start, y, size.width - file_start, 1),
             );
 
             for hl_range in &self.highlight[n] {
@@ -127,7 +148,7 @@ impl Session {
                         &self.buffer[hl_range.clone()],
                         style::Style::default().bg(style::Color::LightYellow),
                     ),
-                    layout::Rect::new(x, y, width, 1),
+                    layout::Rect::new(file_start + x, y, width, 1),
                 );
             }
 
