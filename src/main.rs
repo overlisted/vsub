@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
         process::exit(1);
     };
 
-    let buffer = fs::read_to_string(file)?;
+    let file = fs::OpenOptions::new().read(true).write(true).open(file)?;
 
     let mut stdout = io::stdout();
 
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn error::Error>> {
     panic::set_hook(Box::new(on_panic));
 
     let mut terminal = tui::Terminal::new(tui::backend::CrosstermBackend::new(io::stdout()))?;
-    let mut session = session::Session::new(buffer);
+    let mut session = session::Session::new(file)?;
 
     loop {
         terminal.draw(|f| session.ui(f))?;

@@ -2,11 +2,13 @@ use crate::label::Label;
 use crate::line_table::LineTable;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use regex::Regex;
-use std::fs;
+use std::io::{Read, Seek, Write};
 use std::ops::Range;
+use std::{fs, io};
 use tui::*;
 
 pub struct Session {
+    file: fs::File,
     buffer: String,
     line_table: LineTable,
     prompt: String,
@@ -15,23 +17,36 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(buffer: String) -> Self {
+    pub fn new(mut file: fs::File) -> io::Result<Self> {
+        let mut buffer = String::new();
+        file.read_to_string(&mut buffer)?;
+        file.rewind()?;
+
         let table = LineTable::new(&buffer);
         let lines = table.len();
 
-        Session {
-            line_table: table,
+        Ok(Session {
+            file,
             buffer,
+            line_table: table,
             prompt: String::with_capacity(128),
             highlight: vec![Vec::with_capacity(16); lines],
             scroll: 0,
-        }
+        })
     }
 
     fn command(&mut self) {
         let parts: Vec<&str> = self.prompt.split('/').collect();
 
         match parts.as_slice() {
+            &["w"] => {
+                self.file
+                    .set_len(self.buffer.as_bytes().len() as u64)
+                    .unwrap();
+                self.file.write_all(self.buffer.as_bytes()).unwrap();
+
+                self.prompt.clear();
+            }
             // &["", s, r, ""] => {
             //     let sr = Regex::new(s).unwrap();
             //     let rr = Regex::new(r).unwrap();
