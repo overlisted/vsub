@@ -10,7 +10,7 @@ impl LineTable {
         LineTable {
             indices: buffer
                 .char_indices()
-                .filter(|(_, ch)| *ch == '\n')
+                .filter(|(i, ch)| *i == 0 || *ch == '\n')
                 .map(|(i, _)| i)
                 .collect(),
             buffer_len: buffer.len(),
