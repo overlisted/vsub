@@ -1,5 +1,6 @@
 use crate::label::Label;
 use crate::line_table::LineTable;
+use crate::text_view::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use regex::Regex;
 use std::io::{Read, Seek, Write};
@@ -168,64 +169,32 @@ impl Session {
 
         let number_digits = self.line_table.len().to_string().len() as u16 + 1; // yeah my iq score is 150 how could you tell
 
-        for y in 0..size.height {
-            f.render_widget(
-                Label("~", style::Style::default().bg(style::Color::Black)),
-                layout::Rect::new(0, y, number_digits, 1),
-            );
-        }
+        f.render_widget(
+            LineNumbers {
+                start_at: self.scroll_y,
+                lines: self.line_table.len(),
+            },
+            layout::Rect {
+                width: number_digits,
+                ..size
+            },
+        );
 
-        let mut y = 0;
-        let lines = self.line_table.iter(self.scroll_y);
-        for (n, range) in lines {
-            let shifted = Range {
-                start: range.start + self.scroll_x,
-                end: range.end,
-            };
-
-            if n > self.scroll_y + size.height as usize - 1 {
-                break;
-            }
-
-            let line_number = (n + 1).to_string();
-
-            f.render_widget(
-                Label(
-                    &line_number,
-                    style::Style::default().bg(style::Color::Black),
-                ),
-                layout::Rect::new(0, y, number_digits, 1),
-            );
-
-            let file_start = number_digits + 1;
-
-            if shifted.start < shifted.end {
-                f.render_widget(
-                    Label(&self.buffer[shifted.clone()], style::Style::default()),
-                    layout::Rect::new(file_start, y, size.width - file_start, 1),
-                );
-
-                for hl_range in &self.highlight[n] {
-                    let hl_shifted = Range {
-                        start: hl_range.start + self.scroll_x,
-                        end: hl_range.end,
-                    };
-
-                    let x = hl_range.start as u16 - range.start as u16 - self.scroll_x as u16;
-                    let width = hl_range.end as u16 - hl_range.start as u16;
-
-                    f.render_widget(
-                        Label(
-                            &self.buffer[hl_shifted],
-                            style::Style::default().bg(style::Color::LightYellow),
-                        ),
-                        layout::Rect::new(file_start + x, y, width, 1),
-                    );
-                }
-            }
-
-            y += 1;
-        }
+        f.render_widget(
+            TextView {
+                buffer: &self.buffer,
+                line_table: &self.line_table,
+                highlight: &self.highlight,
+                scroll_x: self.scroll_x,
+                scroll_y: self.scroll_y,
+            },
+            layout::Rect {
+                x: number_digits + 1,
+                y: 0,
+                width: size.width - number_digits - 1,
+                height: size.height - 2,
+            },
+        );
 
         f.render_widget(
             Label(
@@ -234,6 +203,7 @@ impl Session {
             ),
             layout::Rect::new(0, size.height - 2, size.width, 1),
         );
+
         f.render_widget(
             Label(&self.prompt, style::Style::default().bg(style::Color::Red)),
             layout::Rect::new(0, size.height - 1, size.width, 1),
