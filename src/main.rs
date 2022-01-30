@@ -4,6 +4,7 @@
 mod label;
 mod line_table;
 mod session;
+mod text_view;
 
 use crossterm::event::{KeyCode, KeyModifiers};
 use crossterm::{event, terminal};
@@ -15,6 +16,7 @@ fn on_panic(info: &panic::PanicInfo) {
     terminal::disable_raw_mode().unwrap();
 
     println!("{}", info);
+    println!("{:?}", backtrace::Backtrace::new());
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
