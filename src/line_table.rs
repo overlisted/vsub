@@ -49,10 +49,10 @@ impl LineTable {
         self.indices[self.indices.len() - 1]
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (usize, Range<usize>)> + '_ {
+    pub fn iter(&self, start_at: usize) -> impl Iterator<Item = (usize, Range<usize>)> + '_ {
         LineIter {
             table: &self,
-            step: 0,
+            step: start_at,
         }
     }
 }

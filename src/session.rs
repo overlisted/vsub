@@ -11,6 +11,7 @@ pub struct Session {
     line_table: LineTable,
     prompt: String,
     highlight: Vec<Vec<Range<usize>>>,
+    scroll: usize,
 }
 
 impl Session {
@@ -23,6 +24,7 @@ impl Session {
             buffer,
             prompt: String::with_capacity(128),
             highlight: vec![Vec::with_capacity(16); lines],
+            scroll: 0,
         }
     }
 
@@ -104,6 +106,17 @@ impl Session {
                 code: KeyCode::Backspace,
                 ..
             } => drop(self.prompt.pop()),
+            KeyEvent {
+                code: KeyCode::Up, ..
+            } => {
+                if self.scroll > 0 {
+                    self.scroll -= 1
+                }
+            }
+            KeyEvent {
+                code: KeyCode::Down,
+                ..
+            } => self.scroll += 1,
             _ => {}
         }
     }
@@ -121,7 +134,12 @@ impl Session {
         }
 
         let mut y = 0;
-        for (n, range) in self.line_table.iter() {
+        let lines = self.line_table.iter(self.scroll);
+        for (n, range) in lines {
+            if n > self.scroll + size.height as usize - 1 {
+                break;
+            }
+
             let line_number = (n + 1).to_string();
 
             f.render_widget(
