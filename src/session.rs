@@ -13,7 +13,8 @@ pub struct Session {
     line_table: LineTable,
     prompt: String,
     highlight: Vec<Vec<Range<usize>>>,
-    scroll: usize,
+    scroll_y: usize,
+    scroll_x: usize,
 }
 
 impl Session {
@@ -31,7 +32,8 @@ impl Session {
             line_table: table,
             prompt: String::with_capacity(128),
             highlight: vec![Vec::with_capacity(16); lines],
-            scroll: 0,
+            scroll_y: 0,
+            scroll_x: 0,
         })
     }
 
@@ -124,14 +126,26 @@ impl Session {
             KeyEvent {
                 code: KeyCode::Up, ..
             } => {
-                if self.scroll > 0 {
-                    self.scroll -= 1
+                if self.scroll_y > 0 {
+                    self.scroll_y -= 1
                 }
             }
             KeyEvent {
                 code: KeyCode::Down,
                 ..
-            } => self.scroll += 1,
+            } => self.scroll_y += 1,
+            KeyEvent {
+                code: KeyCode::Left,
+                ..
+            } => {
+                if self.scroll_x > 0 {
+                    self.scroll_x -= 1
+                }
+            }
+            KeyEvent {
+                code: KeyCode::Right,
+                ..
+            } => self.scroll_x += 1,
             _ => {}
         }
     }
@@ -149,9 +163,14 @@ impl Session {
         }
 
         let mut y = 0;
-        let lines = self.line_table.iter(self.scroll);
+        let lines = self.line_table.iter(self.scroll_y);
         for (n, range) in lines {
-            if n > self.scroll + size.height as usize - 1 {
+            let shifted = Range {
+                start: range.start + self.scroll_x,
+                end: range.end,
+            };
+
+            if n > self.scroll_y + size.height as usize - 1 {
                 break;
             }
 
@@ -167,22 +186,29 @@ impl Session {
 
             let file_start = number_digits + 1;
 
-            f.render_widget(
-                Label(&self.buffer[range.clone()], style::Style::default()),
-                layout::Rect::new(file_start, y, size.width - file_start, 1),
-            );
-
-            for hl_range in &self.highlight[n] {
-                let x = hl_range.start as u16 - range.start as u16;
-                let width = hl_range.end as u16 - hl_range.start as u16;
-
+            if shifted.start < shifted.end {
                 f.render_widget(
-                    Label(
-                        &self.buffer[hl_range.clone()],
-                        style::Style::default().bg(style::Color::LightYellow),
-                    ),
-                    layout::Rect::new(file_start + x, y, width, 1),
+                    Label(&self.buffer[shifted.clone()], style::Style::default()),
+                    layout::Rect::new(file_start, y, size.width - file_start, 1),
                 );
+
+                for hl_range in &self.highlight[n] {
+                    let hl_shifted = Range {
+                        start: hl_range.start + self.scroll_x,
+                        end: hl_range.end,
+                    };
+
+                    let x = hl_range.start as u16 - range.start as u16 - self.scroll_x as u16;
+                    let width = hl_range.end as u16 - hl_range.start as u16;
+
+                    f.render_widget(
+                        Label(
+                            &self.buffer[hl_shifted],
+                            style::Style::default().bg(style::Color::LightYellow),
+                        ),
+                        layout::Rect::new(file_start + x, y, width, 1),
+                    );
+                }
             }
 
             y += 1;
