@@ -10,8 +10,15 @@ impl LineTable {
         LineTable {
             indices: buffer
                 .char_indices()
-                .filter(|(i, ch)| *i == 0 || *ch == '\n')
-                .map(|(i, _)| i)
+                .filter_map(|(i, ch)| {
+                    if ch == '\n' {
+                        Some(i + 1)
+                    } else if i == 0 {
+                        Some(0)
+                    } else {
+                        None
+                    }
+                })
                 .collect(),
             buffer_len: buffer.len(),
         }
@@ -34,7 +41,7 @@ impl LineTable {
 
     pub fn get_line_at(&self, char: usize) -> usize {
         for i in 0..self.indices.len() - 1 {
-            if self.indices[i + 1] > char {
+            if self.indices[i + 1] >= char {
                 return i;
             }
         }

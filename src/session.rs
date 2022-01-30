@@ -115,7 +115,7 @@ impl Session {
         for (n, range) in self.line_table.iter() {
             f.render_widget(
                 Label(&self.buffer[range.clone()], style::Style::default()),
-                layout::Rect::new(1, y, size.width - 1, 1),
+                layout::Rect::new(0, y, size.width, 1),
             );
 
             for hl_range in &self.highlight[n] {
