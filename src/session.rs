@@ -164,20 +164,24 @@ impl Session {
         }
     }
 
-    pub fn ui<B: backend::Backend>(&self, f: &mut Frame<B>) {
-        let size = f.size();
+    fn file_ui<B: backend::Backend>(&self, f: &mut Frame<B>, area: layout::Rect) {
+        let number_digits = self.line_table.len().to_string().len() as u16 + 1;
 
-        let number_digits = self.line_table.len().to_string().len() as u16 + 1; // yeah my iq score is 150 how could you tell
+        let chunks = layout::Layout::default()
+            .direction(layout::Direction::Horizontal)
+            .constraints([
+                layout::Constraint::Length(number_digits),
+                layout::Constraint::Length(1),
+                layout::Constraint::Min(1),
+            ])
+            .split(area);
 
         f.render_widget(
             LineNumbers {
                 start_at: self.scroll_y,
                 lines: self.line_table.len(),
             },
-            layout::Rect {
-                width: number_digits,
-                ..size
-            },
+            chunks[0],
         );
 
         f.render_widget(
@@ -188,25 +192,33 @@ impl Session {
                 scroll_x: self.scroll_x,
                 scroll_y: self.scroll_y,
             },
-            layout::Rect {
-                x: number_digits + 1,
-                y: 0,
-                width: size.width - number_digits - 1,
-                height: size.height - 2,
-            },
+            chunks[2],
         );
+    }
+
+    pub fn ui<B: backend::Backend>(&self, f: &mut Frame<B>) {
+        let chunks = layout::Layout::default()
+            .direction(layout::Direction::Vertical)
+            .constraints([
+                layout::Constraint::Min(0),
+                layout::Constraint::Length(1),
+                layout::Constraint::Length(1),
+            ])
+            .split(f.size());
+
+        self.file_ui(f, chunks[0]);
 
         f.render_widget(
             Label(
                 &self.status,
                 style::Style::default().bg(style::Color::LightRed),
             ),
-            layout::Rect::new(0, size.height - 2, size.width, 1),
+            chunks[1],
         );
 
         f.render_widget(
             Label(&self.prompt, style::Style::default().bg(style::Color::Red)),
-            layout::Rect::new(0, size.height - 1, size.width, 1),
+            chunks[2],
         );
     }
 }
