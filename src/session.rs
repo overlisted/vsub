@@ -2,6 +2,7 @@ use crate::line_table::LineTable;
 use crate::widgets::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use regex::Regex;
+use std::borrow::Cow;
 use std::io::{Read, Seek, Write};
 use std::ops::Range;
 use std::{fs, io};
@@ -52,14 +53,27 @@ impl Session {
                 self.prompt.clear();
                 self.status = format!("{} bytes written", n);
             }
-            // &["", s, r, ""] => {
-            //     let sr = Regex::new(s).unwrap();
-            //     let rr = Regex::new(r).unwrap();
-            //
-            //     for m in sr.find_iter(&self.buffer) {
-            //
-            //     }
-            // }
+            &["s", s, r, ""] => {
+                for line in &mut self.highlight {
+                    line.clear();
+                }
+
+                let find = Regex::new(s).unwrap();
+
+                let new = find.replace_all(&self.buffer, r);
+
+                self.status = format!(
+                    "difference: {} characters",
+                    self.buffer.len() as isize - new.len() as isize
+                );
+
+                if let Cow::Owned(s) = new {
+                    self.buffer = s;
+                }
+
+                self.line_table = LineTable::new(&self.buffer);
+                self.prompt.clear();
+            }
             &["s", s, ""] => {
                 for line in &mut self.highlight {
                     line.clear();
