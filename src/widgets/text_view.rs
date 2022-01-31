@@ -66,13 +66,21 @@ impl widgets::Widget for TextView<'_> {
                 );
 
                 for hl_range in &self.highlight[n] {
-                    let x = hl_range.start - range.start;
+                    let mut x = hl_range.start - range.start;
+                    let mut hl_shifted = hl_range.clone();
 
-                    if x < area.width as usize {
+                    if x < self.scroll_x {
+                        // todo: self.scroll_x % hl_range.len()
+                        hl_shifted.start = hl_range.start + self.scroll_x;
+                        x += self.scroll_x;
+                    }
+
+                    if x < area.width as usize + self.scroll_x && hl_shifted.start < hl_shifted.end
+                    {
                         buf.set_string(
-                            area.x + x as u16,
+                            area.x + x as u16 - self.scroll_x as u16,
                             y,
-                            &self.buffer[hl_range.clone()],
+                            &self.buffer[hl_shifted],
                             style::Style::default().bg(style::Color::LightYellow),
                         );
                     }
