@@ -1,12 +1,57 @@
+use crate::commands;
 use crate::line_table::LineTable;
 use crate::widgets::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use regex::Regex;
-use std::borrow::Cow;
 use std::io::{Read, Seek, Write};
 use std::ops::Range;
 use std::{fs, io};
 use tui::*;
+
+pub struct CommandInterface<'s>(&'s mut Session);
+
+impl<'s> CommandInterface<'s> {
+    pub fn save_buffer(&mut self) -> io::Result<usize> {
+        let bytes = self.0.buffer.as_bytes();
+
+        self.0.file.set_len(bytes.len() as u64)?;
+        let n = self.0.file.write(bytes)?;
+        self.0.file.rewind()?;
+
+        Ok(n)
+    }
+
+    // this is fucking stupid
+    pub fn highlight(
+        &mut self,
+        mut f: impl FnMut(&mut Vec<Vec<Range<usize>>>, &String, &LineTable),
+    ) {
+        f(&mut self.0.highlight, &self.0.buffer, &self.0.line_table)
+    }
+
+    pub fn reset_highlight(&mut self) {
+        self.0.highlight = vec![Vec::with_capacity(16); self.0.line_table.len()];
+    }
+
+    pub fn update_buffer(&mut self, f: impl FnOnce(&mut String)) {
+        f(&mut self.0.buffer);
+
+        self.0.line_table = LineTable::new(&self.0.buffer);
+        self.reset_highlight();
+    }
+
+    pub fn get_buffer(&self) -> &String {
+        &self.0.buffer
+    }
+
+    pub fn finalize(self, clear_prompt: bool, status: String) {
+        self.0.status = status;
+
+        if clear_prompt {
+            self.0.prompt.clear();
+        }
+    }
+}
 
 pub struct Session {
     file: fs::File,
@@ -40,100 +85,19 @@ impl Session {
         })
     }
 
-    fn command(&mut self) {
+    fn get_command(&self) -> Option<Box<dyn commands::Command>> {
         let parts: Vec<&str> = self.prompt.split('/').collect();
 
-        match parts.as_slice() {
-            &["w"] => {
-                self.file
-                    .set_len(self.buffer.as_bytes().len() as u64)
-                    .unwrap();
-                let n = self.file.write(self.buffer.as_bytes()).unwrap();
-
-                self.prompt.clear();
-                self.status = format!("{} bytes written", n);
-            }
-            &["s", s, r, ""] => {
-                for line in &mut self.highlight {
-                    line.clear();
-                }
-
-                let find = Regex::new(s).unwrap();
-
-                let new = find.replace_all(&self.buffer, r);
-
-                self.status = format!(
-                    "difference: {} characters",
-                    self.buffer.len() as isize - new.len() as isize
-                );
-
-                if let Cow::Owned(s) = new {
-                    self.buffer = s;
-                }
-
-                self.line_table = LineTable::new(&self.buffer);
-                self.prompt.clear();
-            }
-            &["s", s, ""] => {
-                for line in &mut self.highlight {
-                    line.clear();
-                }
-
-                let regex = Regex::new(s).unwrap();
-
-                let old_len = self.buffer.len();
-                self.buffer.remove_matches(&regex);
-
-                self.line_table = LineTable::new(&self.buffer);
-                self.prompt.clear();
-
-                self.status = format!("{} characters less", old_len - self.buffer.len());
-            }
-            &["p", s, ""] => {
-                for line in &mut self.highlight {
-                    line.clear();
-                }
-
-                let regex = Regex::new(s).unwrap();
-                let mut matches: usize = 0;
-                let mut lines: usize = 0;
-
-                for m in regex.find_iter(&self.buffer) {
-                    let mut line_n = self.line_table.get_line_at(m.start());
-
-                    loop {
-                        let (line_start, line_end) = self.line_table.get_bounds(line_n);
-
-                        let final_range = Range {
-                            start: if line_start < m.start() {
-                                m.start()
-                            } else {
-                                line_start
-                            },
-                            end: if line_end > m.end() {
-                                m.end()
-                            } else {
-                                line_end
-                            },
-                        };
-
-                        self.highlight[line_n].push(final_range);
-
-                        if line_end >= m.end() {
-                            break;
-                        }
-
-                        line_n += 1;
-                        lines += 1;
-                    }
-
-                    matches += 1;
-                }
-
-                self.status = format!("{} matches, {} lines", matches, lines);
-            }
-            _ => {}
-        }
+        Some(match parts.as_slice() {
+            &["w"] => Box::new(commands::file::Write),
+            &["s", s, r, ""] => Box::new(commands::regex::Substitute(
+                Regex::new(s).unwrap(),
+                r.into(),
+            )),
+            &["s", s, ""] => Box::new(commands::regex::Remove(Regex::new(s).unwrap())),
+            &["p", s, ""] => Box::new(commands::regex::Highlight(Regex::new(s).unwrap())),
+            _ => return None,
+        })
     }
 
     pub fn key(&mut self, event: KeyEvent) {
@@ -145,7 +109,15 @@ impl Session {
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
-            } => self.command(),
+            } => {
+                if let Some(mut command) = self.get_command() {
+                    let interface = CommandInterface(self);
+
+                    if let Err(e) = command.run(interface) {
+                        self.status = format!("Error: {}", e);
+                    }
+                }
+            }
             KeyEvent {
                 code: KeyCode::Backspace,
                 ..

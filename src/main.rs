@@ -1,6 +1,7 @@
 #![feature(string_remove_matches)]
 #![feature(pattern)]
 
+mod commands;
 mod line_table;
 mod session;
 mod widgets;
