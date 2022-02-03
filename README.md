@@ -1,6 +1,8 @@
 # vsub
 A visual regex substitution tool
 
+![Screenshot demo](screenshot.png)
+
 ## Commands
 ### `w`
 **W**rite (save) the edited buffer to the opened file
